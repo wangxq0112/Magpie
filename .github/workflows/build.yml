@@ -5,14 +5,15 @@ on:
     paths: [ '.github/workflows/build.yml', 'Magpie.slnx', '*.props', 'scripts/publish.py', 'src/**' ]
   pull_request:
     paths: [ '.github/workflows/build.yml', 'Magpie.slnx', '*.props', 'scripts/publish.py', 'src/**' ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-2025-vs2026
     strategy:
       matrix:
-        compiler: ["MSVC", "ClangCL"]
-        platform: ["x64", "ARM64"]
+        compiler: ["MSVC"]
+        platform: ["x64"]
 
     steps:
     - uses: actions/checkout@v6
@@ -30,13 +31,9 @@ jobs:
         path: ~/.conan2/p
         key: Conan-${{ hashFiles('src/**/conanfile.txt') }}-${{ matrix.compiler }}-${{ matrix.platform }}
 
-    - name: Build
-      if: github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main'
+    # 【关键修改】：去掉了 if 判断，强制执行无签名的标准构建
+    - name: Build Without Signature
       run: python scripts/publish.py --compiler=${{ matrix.compiler }} --platform=${{ matrix.platform }}
-
-    - name: Build and sign
-      if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
-      run: python scripts/publish.py --compiler=${{ matrix.compiler }} --platform=${{ matrix.platform }} --pfx-path=certs\Magpie.pfx --pfx-password="${{ secrets.MAGPIE_PFX_PASSWORD }}"
 
     - name: Save hash
       id: hash
