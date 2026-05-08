@@ -2,48 +2,45 @@ name: build
 
 on:
   push:
-    paths: [ '.github/workflows/build.yml', 'Magpie.sln', '*.props', 'scripts/publish.py', 'src/**' ]
+    paths: [ '.github/workflows/build.yml', 'Magpie.slnx', '*.props', 'scripts/publish.py', 'src/**' ]
   pull_request:
-    paths: [ '.github/workflows/build.yml', 'Magpie.sln', '*.props', 'scripts/publish.py', 'src/**' ]
+    paths: [ '.github/workflows/build.yml', 'Magpie.slnx', '*.props', 'scripts/publish.py', 'src/**' ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     strategy:
       matrix:
-        compiler: ["MSVC", "ClangCL"]
-        platform: ["x64", "ARM64"]
+        compiler: ["MSVC"]
+        platform: ["x64"]
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
 
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v6
       with:
-        python-version: '3.11'
+        python-version: '3.13'
 
     - name: Setup Conan
       run: pip install conan
 
     - name: Load Conan cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.conan2/p
         key: Conan-${{ hashFiles('src/**/conanfile.txt') }}-${{ matrix.compiler }}-${{ matrix.platform }}
 
-    - name: Build
-      if: github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main'
+    # 【关键修改】：去掉了 if 判断，强制执行无签名的标准构建
+    - name: Build Without Signature
       run: python scripts/publish.py --compiler=${{ matrix.compiler }} --platform=${{ matrix.platform }}
-
-    - name: Build and sign
-      if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
-      run: python scripts/publish.py --compiler=${{ matrix.compiler }} --platform=${{ matrix.platform }} --pfx-path=certs\Magpie.pfx --pfx-password="${{ secrets.MAGPIE_PFX_PASSWORD }}"
 
     - name: Save hash
       id: hash
       run: echo "sha_short=$(git rev-parse --short HEAD)" >> $env:GITHUB_OUTPUT
 
     - name: Store build
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with: 
           name: Magpie-dev-${{ steps.hash.outputs.sha_short }}-${{ matrix.compiler }}-${{ matrix.platform }}
           path: ./publish/${{ matrix.platform }}
